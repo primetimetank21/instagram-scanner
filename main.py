@@ -13,8 +13,7 @@ def save_names(f_names, filename):
 
 # TODO:
 # figure out how to get rid of "Verified" when writing to file
-async def get_names(page, text, nth, limit, filename):
-    await page.locator(f"text={text}").nth(nth).focus()
+async def get_names(page, limit, filename):
     await page.keyboard.press("Tab")
     await page.keyboard.press("Tab")
 
@@ -77,8 +76,6 @@ async def run(playwright):
 
     followers_names = await get_names(
         page=page,
-        text="Followers",
-        nth=-2,
         limit=followers_amount,
         filename="followers_links.txt",
     )
@@ -88,8 +85,6 @@ async def run(playwright):
     sleep(4)
     following_names = await get_names(
         page=page,
-        text="Following",
-        nth=3,
         limit=following_amount,
         filename="following_links.txt",
     )
