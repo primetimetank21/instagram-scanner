@@ -2,7 +2,9 @@ import asyncio
 from playwright.async_api import async_playwright
 from time import sleep
 
+
 # pylint: disable=fixme,bare-except
+# TODO: add logging instead of print statements
 
 
 def save_names(f_names, filename):
@@ -11,17 +13,22 @@ def save_names(f_names, filename):
             f.write(f_name)
 
 
-# TODO:
+# maybe TODO:
 # figure out how to get rid of "Verified" when writing to file
 async def get_names(page, limit, filename):
     await page.keyboard.press("Tab")
     await page.keyboard.press("Tab")
+    await page.keyboard.press("Tab")
+    await page.keyboard.press("Tab")
 
     f_names = set()
+    same_length_count: int = 0
+    f_names_old_length: int = 0
 
     for i in range(limit):
-        for _ in range(50):
+        for _ in range(20):
             await page.keyboard.press("ArrowDown")
+            sleep(0.5)
 
         if i % 10 == 0:
             tmp_name_list = await page.locator("role=link").all_inner_texts()
@@ -29,7 +36,18 @@ async def get_names(page, limit, filename):
             if len(f_names) >= limit:
                 break
 
-        sleep(0.75)
+            if f_names_old_length == len(f_names):
+                same_length_count += 1
+                print(f"stuck count: {same_length_count}")
+            else:
+                same_length_count = 0
+                f_names_old_length = len(f_names)
+                print(f"current length: {len(f_names)}")
+
+            if same_length_count >= 10:
+                break
+
+        sleep(2)
 
     tmp_name_list = await page.locator("role=link").all_inner_texts()
     f_names.update(tmp_name_list)
@@ -63,7 +81,7 @@ async def run(playwright):
     page = await context.new_page()
     url = "https://www.instagram.com/primetimetank_"
     await page.goto(url)
-    sleep(10)
+    sleep(5)
 
     followers_amount = await page.locator("text=followers").all_inner_texts()
     followers_amount = int(followers_amount[0].split(" ")[0].replace(",", ""))
@@ -72,7 +90,7 @@ async def run(playwright):
     following_amount = int(following_amount[0].split(" ")[0].replace(",", ""))
 
     await page.goto(f"{url}/followers")
-    sleep(4)
+    sleep(5)
 
     followers_names = await get_names(
         page=page,
@@ -82,7 +100,7 @@ async def run(playwright):
     print(f"Followers: {len(followers_names)}")
 
     await page.goto(f"{url}/following")
-    sleep(4)
+    sleep(5)
     following_names = await get_names(
         page=page,
         limit=following_amount,
