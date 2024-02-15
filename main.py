@@ -1,21 +1,25 @@
 import asyncio
-from typing import Set
-from playwright.async_api import async_playwright
+from typing import List, Set
+from playwright.async_api import (
+    async_playwright,
+    Page,
+    BrowserContext,
+    Browser,
+    BrowserType,
+)
 from time import sleep
 
 
 # TODO: add logging instead of print statements
 
 
-def save_names(f_names, filename):
+def save_names(f_names: Set[str], filename: str) -> None:
     with open(filename, "w", encoding="utf-8") as f:
         for f_name in f_names:
             f.write(f_name)
 
 
-# maybe TODO:
-# figure out how to get rid of "Verified" when writing to file
-async def get_names(page, limit, filename) -> Set[str]:
+async def get_names(page: Page, limit: int, filename: str) -> Set[str]:
     await page.keyboard.press("Tab")
     await page.keyboard.press("Tab")
     await page.keyboard.press("Tab")
@@ -31,7 +35,7 @@ async def get_names(page, limit, filename) -> Set[str]:
             sleep(0.5)
 
         if i % 10 == 0:
-            tmp_name_list = await page.locator("role=link").all_inner_texts()
+            tmp_name_list: List[str] = await page.locator("role=link").all_inner_texts()
             f_names.update(tmp_name_list)
             if len(f_names) >= limit:
                 break
@@ -58,11 +62,14 @@ async def get_names(page, limit, filename) -> Set[str]:
         except Exception:
             continue
 
+    f_names_list = sorted(f_names)
+    f_names.clear()
+
     with open(filename, "w", encoding="utf-8") as f:
-        for f_name in f_names:
+        for f_name in f_names_list:
             f.write(f"https://www.instagram.com/{f_name}\n")
 
-    f_names.clear()
+    del f_names_list
 
     with open(filename, "r", encoding="utf-8") as f:
         for f_name in f.readlines():
@@ -74,25 +81,31 @@ async def get_names(page, limit, filename) -> Set[str]:
     return f_names
 
 
-async def run(playwright):
-    firefox = playwright.firefox
-    browser = await firefox.launch(headless=False)
-    context = await browser.new_context(storage_state="instagram.json")
-    page = await context.new_page()
-    url = "https://www.instagram.com/primetimetank_"
+async def run(playwright) -> None:
+    firefox: BrowserType = playwright.firefox
+    browser: Browser = await firefox.launch(headless=False)
+
+    # TODO: try and create two pages and get both followers/following at same time
+    context: BrowserContext = await browser.new_context(storage_state="instagram.json")
+    page: Page = await context.new_page()
+    url: str = "https://www.instagram.com/primetimetank_"
     await page.goto(url)
     sleep(5)
 
-    followers_amount = await page.locator("text=followers").all_inner_texts()
-    followers_amount = int(followers_amount[0].split(" ")[0].replace(",", ""))
+    followers_amount_list: List[str] = await page.locator(
+        "text=followers"
+    ).all_inner_texts()
+    followers_amount: int = int(followers_amount_list[0].split(" ")[0].replace(",", ""))
 
-    following_amount = await page.locator("text=following").all_inner_texts()
-    following_amount = int(following_amount[0].split(" ")[0].replace(",", ""))
+    following_amount_list: List[str] = await page.locator(
+        "text=following"
+    ).all_inner_texts()
+    following_amount: int = int(following_amount_list[0].split(" ")[0].replace(",", ""))
 
     await page.goto(f"{url}/followers")
     sleep(5)
 
-    followers_names = await get_names(
+    followers_names: Set[str] = await get_names(
         page=page,
         limit=followers_amount,
         filename="followers_links.txt",
@@ -101,15 +114,15 @@ async def run(playwright):
 
     await page.goto(f"{url}/following")
     sleep(5)
-    following_names = await get_names(
+    following_names: Set[str] = await get_names(
         page=page,
         limit=following_amount,
         filename="following_links.txt",
     )
     print(f"Following: {len(following_names)}")
 
-    not_following_me_back = following_names.difference(followers_names)
-    im_not_following_back = followers_names.difference(following_names)
+    not_following_me_back: Set[str] = following_names.difference(followers_names)
+    im_not_following_back: Set[str] = followers_names.difference(following_names)
 
     print(f"Not following me back: {len(not_following_me_back)}")
     save_names(f_names=not_following_me_back, filename="not_following_me_back.txt")
@@ -121,10 +134,14 @@ async def run(playwright):
     await browser.close()
 
 
-async def main():
+async def async_main() -> None:
     async with async_playwright() as playwright:
         await run(playwright)
 
 
-if __name__ == "__main__":
-    asyncio.run(main())
+def main() -> None:
+    if __name__ == "__main__":
+        asyncio.run(async_main())
+
+
+main()
