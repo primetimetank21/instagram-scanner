@@ -1,9 +1,9 @@
 import asyncio
+from typing import Set
 from playwright.async_api import async_playwright
 from time import sleep
 
 
-# pylint: disable=fixme,bare-except
 # TODO: add logging instead of print statements
 
 
@@ -15,13 +15,13 @@ def save_names(f_names, filename):
 
 # maybe TODO:
 # figure out how to get rid of "Verified" when writing to file
-async def get_names(page, limit, filename):
+async def get_names(page, limit, filename) -> Set[str]:
     await page.keyboard.press("Tab")
     await page.keyboard.press("Tab")
     await page.keyboard.press("Tab")
     await page.keyboard.press("Tab")
 
-    f_names = set()
+    f_names: Set[str] = set()
     same_length_count: int = 0
     f_names_old_length: int = 0
 
@@ -55,7 +55,7 @@ async def get_names(page, limit, filename):
     for name in ("", "primetimetank_", "explore", "Verified"):
         try:
             f_names.remove(name)
-        except:
+        except Exception:
             continue
 
     with open(filename, "w", encoding="utf-8") as f:

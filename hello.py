@@ -1,8 +1,14 @@
-def hello(name="John"):
-    phrase = f"Hello {name}!"
+def hello(name: str = "John") -> str:
+    """Say hello to `name`"""
+    phrase: str = f"Hello {name}!"
     print(phrase)
     return phrase
 
 
-if __name__ == "__main__":
-    hello()
+def main() -> None:
+    """Code Entrypoint"""
+    if __name__ == "__main__":
+        hello()
+
+
+main()
