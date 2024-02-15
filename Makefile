@@ -7,6 +7,7 @@ PYTHON = $(VENV_NAME)/bin/python
 RUFF = $(VENV_NAME)/bin/ruff
 MYPY = $(VENV_NAME)/bin/mypy
 PYTEST = $(VENV_NAME)/bin/pytest
+PLAYWRIGHT = $(VENV_NAME)/bin/playwright
 MUTE_OUTPUT = 1>/dev/null
 ALL_PYTHON_FILES := $$(git ls-files "*.py")
 ALL_iPYTHON_FILES := $$(git ls-files "*.ipynb")
@@ -17,6 +18,7 @@ install: requirements.txt
 	@ chmod +x ./.github/add_github_hooks.sh && ./.github/add_github_hooks.sh
 	@ echo "Installing dependencies... [START]" && \
 	$(PIP) install --upgrade pip $(MUTE_OUTPUT) && $(PIP) install -r requirements.txt $(MUTE_OUTPUT) && \
+	$(PLAYWRIGHT) install && \
 	echo "Installing dependencies... [FINISHED]"
 
 # Create/Activate env; install dependencies
