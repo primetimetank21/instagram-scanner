@@ -130,7 +130,11 @@ dmypy.json
 
 # Generated .txt files
 *.txt
-!requirements.txt
+!requirements/*
 
 # Personal JSON Cookies file
 instagram.json
+
+# Instagram Users
+instagram_users*.json
+example_response.json
