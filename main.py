@@ -1,142 +1,200 @@
-import asyncio
-from typing import List, Set
+from typing import Final, List, Dict, Union
+from requests import Response
 from playwright.async_api import (
     async_playwright,
+    Cookie,
+    Playwright,
     Page,
     BrowserContext,
     Browser,
     BrowserType,
 )
+from pathlib import Path
 from time import sleep
+import asyncio
+import requests
+import json
+
+WAIT_TIME: Final[int] = 15
 
 
-# TODO: add logging instead of print statements
-
-
-def save_names(f_names: Set[str], filename: str) -> None:
-    with open(filename, "w", encoding="utf-8") as f:
-        for f_name in f_names:
-            f.write(f_name)
-
-
-async def get_names(page: Page, limit: int, filename: str) -> Set[str]:
-    await page.keyboard.press("Tab")
-    await page.keyboard.press("Tab")
-    await page.keyboard.press("Tab")
-    await page.keyboard.press("Tab")
-
-    f_names: Set[str] = set()
-    same_length_count: int = 0
-    f_names_old_length: int = 0
-
-    for i in range(limit):
-        for _ in range(20):
-            await page.keyboard.press("ArrowDown")
-            sleep(0.5)
-
-        if i % 10 == 0:
-            tmp_name_list: List[str] = await page.locator("role=link").all_inner_texts()
-            f_names.update(tmp_name_list)
-            if len(f_names) >= limit:
-                break
-
-            if f_names_old_length == len(f_names):
-                same_length_count += 1
-                print(f"stuck count: {same_length_count}")
-            else:
-                same_length_count = 0
-                f_names_old_length = len(f_names)
-                print(f"current length: {len(f_names)}")
-
-            if same_length_count >= 10:
-                break
-
-        sleep(2)
-
-    tmp_name_list = await page.locator("role=link").all_inner_texts()
-    f_names.update(tmp_name_list)
-
-    for name in ("", "primetimetank_", "explore", "Verified"):
-        try:
-            f_names.remove(name)
-        except Exception:
-            continue
-
-    f_names_list = sorted(f_names)
-    f_names.clear()
-
-    with open(filename, "w", encoding="utf-8") as f:
-        for f_name in f_names_list:
-            f.write(f"https://www.instagram.com/{f_name}\n")
-
-    del f_names_list
-
-    with open(filename, "r", encoding="utf-8") as f:
-        for f_name in f.readlines():
-            if f_name != "Verified":
-                f_names.add(f_name)
-
-    save_names(f_names=f_names, filename=filename)
-
-    return f_names
-
-
-async def run(playwright) -> None:
+async def get_stats(
+    playwright: Playwright,
+    account_user_name: str = "primetimetank_",
+    headless: bool = True,
+) -> None:
     firefox: BrowserType = playwright.firefox
-    browser: Browser = await firefox.launch(headless=False)
-
-    # TODO: try and create two pages and get both followers/following at same time
+    browser: Browser = await firefox.launch(headless=headless)
     context: BrowserContext = await browser.new_context(storage_state="instagram.json")
     page: Page = await context.new_page()
-    url: str = "https://www.instagram.com/primetimetank_"
+    url = f"https://www.instagram.com/{account_user_name}"
     await page.goto(url)
-    sleep(5)
+    sleep(WAIT_TIME)
 
-    followers_amount_list: List[str] = await page.locator(
+    cookies: List[Cookie] = await context.cookies()
+    ds_user_id: str = ""
+
+    for cookie in cookies:
+        # print(f"{cookie['name']:<20}:\t\t{cookie['value'][:25]}")
+        if cookie["name"] == "ds_user_id":
+            # print(cookie)
+            # print(cookie["name"],":",cookie["value"])
+            ds_user_id = cookie["value"]
+            break
+
+    # Reformat the cookies
+    cookie_dict: Dict[str, str] = {
+        cookie["name"]: cookie["value"] for cookie in cookies
+    }
+
+    followers_amount_str: List[str] = await page.locator(
         "text=followers"
     ).all_inner_texts()
-    followers_amount: int = int(followers_amount_list[0].split(" ")[0].replace(",", ""))
+    followers_amount: int = int(followers_amount_str[0].split(" ")[0].replace(",", ""))
 
-    following_amount_list: List[str] = await page.locator(
+    following_amount_str: List[str] = await page.locator(
         "text=following"
     ).all_inner_texts()
-    following_amount: int = int(following_amount_list[0].split(" ")[0].replace(",", ""))
+    following_amount: int = int(following_amount_str[0].split(" ")[0].replace(",", ""))
 
-    await page.goto(f"{url}/followers")
-    sleep(5)
+    a_handle = await page.evaluate_handle("document.body")
+    result_handle = await page.evaluate_handle("body => body.innerHTML", a_handle)
+    script_str = await result_handle.json_value()
+    # print(await result_handle.json_value())
+    await result_handle.dispose()
 
-    followers_names: Set[str] = await get_names(
-        page=page,
-        limit=followers_amount,
-        filename="followers_links.txt",
-    )
-    print(f"Followers: {len(followers_names)}")
+    x_ig_app_id: str = ""
 
-    await page.goto(f"{url}/following")
-    sleep(5)
-    following_names: Set[str] = await get_names(
-        page=page,
-        limit=following_amount,
-        filename="following_links.txt",
-    )
-    print(f"Following: {len(following_names)}")
+    if "X-IG-App-ID" in script_str:
+        starting_index: int = script_str.index("X-IG-App-ID")
+        end_index: int = script_str[starting_index : starting_index + 50].index("}")
+        x_ig_app_id = str(
+            int(
+                script_str[starting_index : starting_index + end_index]
+                .split(",")[0]
+                .split(":")[1]
+                .replace('"', "")
+                .replace('"', "")
+            )
+        )
+        # print(x_ig_app_id)
 
-    not_following_me_back: Set[str] = following_names.difference(followers_names)
-    im_not_following_back: Set[str] = followers_names.difference(following_names)
+    instagram_users: Dict[str, List[Dict]] = {"followers": [], "following": []}
+    COUNT: Final[int] = 100
 
-    print(f"Not following me back: {len(not_following_me_back)}")
-    save_names(f_names=not_following_me_back, filename="not_following_me_back.txt")
+    for key in instagram_users.keys():
+        user_count: int = 0
+        expected_max_users: int = -1
+        stuck_count: int = 0
+        max_id: str = ""
 
-    print(f"I'm not following back: {len(im_not_following_back)}")
-    save_names(f_names=im_not_following_back, filename="im_not_following_back.txt")
+        if key == "followers":
+            expected_max_users = followers_amount
+        elif key == "following":
+            expected_max_users = following_amount
+        else:
+            raise Exception("Error: Invalid key (should be 'followers' or 'following'")
+
+        while all([user_count < expected_max_users, stuck_count < 5]):
+            headers: Dict[str, str] = {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:130.0) Gecko/20100101 Firefox/130.0",
+                "Accept": "*/*",
+                "Accept-Language": "en-US,en;q=0.5",
+                "X-IG-App-ID": x_ig_app_id,
+                "X-Requested-With": "XMLHttpRequest",
+                "Alt-Used": "www.instagram.com",
+                "Connection": "keep-alive",
+                "Referer": f"https://www.instagram.com/{account_user_name}/{key}/",
+                "Sec-Fetch-Dest": "empty",
+                "Sec-Fetch-Mode": "cors",
+                "Sec-Fetch-Site": "same-origin",
+            }
+
+            params: Dict[str, Union[str, int]] = {
+                "count": COUNT,
+                "max_id": max_id,
+                "search_surface": "follow_list_page",
+            }
+
+            try:
+                response: Response = requests.get(
+                    # 'https://www.instagram.com/api/v1/friendships/462306021/followers/',
+                    f"https://www.instagram.com/api/v1/friendships/{ds_user_id}/{key}/",
+                    params=params,
+                    cookies=cookie_dict,
+                    headers=headers,
+                )
+
+                response_dict = response.json()
+
+                instagram_users[key] += response_dict["users"]
+                user_count = len(instagram_users[key])
+
+                with open("instagram_users1.json", "w", encoding="utf-8") as f:
+                    json.dump(instagram_users, f, indent=4)
+
+                print(
+                    f"Updated instagram_users for {key} (current length: {user_count})"
+                )
+
+                # prepare for next loop iteration
+                max_id = response_dict["next_max_id"]
+                stuck_count = 0
+
+            except Exception as e:
+                print(e)
+                stuck_count += 1
+                print(f"Got stuck: {stuck_count}")
+            finally:
+                sleep(5)
 
     await context.close()
     await browser.close()
 
+    not_following_me_back: List[dict] = []
+    for instagram_user_im_following in instagram_users["following"]:
+        user_name_im_following = instagram_user_im_following["username"]
+        # print(user_name_im_following, end=" ")
+        is_following_me_back: bool = False
+        for instagram_follower in instagram_users["followers"]:
+            if user_name_im_following == instagram_follower["username"]:
+                is_following_me_back = True
+                break
+        if not is_following_me_back:
+            not_following_me_back.append(instagram_user_im_following)
+
+    im_not_following_back: List[dict] = []
+    for instagram_user_following_me in instagram_users["followers"]:
+        user_name_following_me = instagram_user_following_me["username"]
+        im_following_back: bool = False
+        for instagram_following in instagram_users["following"]:
+            if user_name_following_me == instagram_following["username"]:
+                im_following_back = True
+                break
+        if not im_following_back:
+            im_not_following_back.append(instagram_user_following_me)
+
+    instagram_stats_dir = Path(Path.cwd(), "statistics")
+    instagram_stats_dir.mkdir(exist_ok=True, parents=True)
+
+    with open(
+        Path(instagram_stats_dir, "not_following_me_back.txt"), "w", encoding="utf-8"
+    ) as f:
+        for instagram_user in not_following_me_back:
+            user_name = instagram_user["username"]
+            f.write(f"https://www.instagram.com/{user_name}\n")
+
+    with open(
+        Path(instagram_stats_dir, "im_not_following_back.txt"), "w", encoding="utf-8"
+    ) as f:
+        for instagram_user in im_not_following_back:
+            user_name = instagram_user["username"]
+            f.write(f"https://www.instagram.com/{user_name}\n")
+
 
 async def async_main() -> None:
     async with async_playwright() as playwright:
-        await run(playwright)
+        await get_stats(playwright, headless=True)
 
 
 def main() -> None:

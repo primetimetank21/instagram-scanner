@@ -1,4 +1,5 @@
 .DEFAULT_GOAL := all
+# .SILENT: install
 
 # Variables
 DEV = 1
@@ -36,11 +37,19 @@ endif
 .PHONY: install
 install: $(REQUIREMENTS)
 	@ chmod +x ./.github/add_github_hooks.sh && ./.github/add_github_hooks.sh
-	@ echo "Installing dependencies... [START]" && \
+	@ echo "Installing dependencies... [START]"
+	@ $(PIP) install --upgrade pip && \
+	$(PIP) install --upgrade wheel && \
+	$(PIP) install -r $(REQUIREMENTS) && \
+	$(PLAYWRIGHT) install && \
+	yes | $(MYPY) --install-types && \
+	echo "Installing dependencies... [FINISHED]"
+#	@ echo "Installing dependencies... [START]" && \
 	$(PIP) install --upgrade pip      $(MUTE_OUTPUT) && \
 	$(PIP) install --upgrade wheel    $(MUTE_OUTPUT) && \
 	$(PIP) install -r $(REQUIREMENTS) $(MUTE_OUTPUT) && \
 	$(PLAYWRIGHT) install $(MUTE_OUTPUT) && \
+	$(MYPY) --install-types $(MUTE_OUTPUT) && \
 	echo "Installing dependencies... [FINISHED]"
 
 # Create/Activate env; install dependencies
