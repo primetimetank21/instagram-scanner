@@ -11,6 +11,7 @@ from playwright.async_api import (
 )
 from pathlib import Path
 from time import sleep
+from datetime import datetime
 import asyncio
 import requests
 import json
@@ -79,6 +80,15 @@ async def get_stats(
         )
         # print(x_ig_app_id)
 
+    instagram_stats_dir = Path(Path.cwd(), "statistics")
+    instagram_stats_dir.mkdir(exist_ok=True, parents=True)
+    instagram_users_dir = Path(instagram_stats_dir, "instagram_users")
+    instagram_users_dir.mkdir(exist_ok=True, parents=True)
+    instagram_users_filename: Path = Path(
+        instagram_users_dir,
+        f"instagram_users_{datetime.now().strftime('%d_%b_%Y_at_%H_%M_%S')}.json",
+    )
+
     instagram_users: Dict[str, List[Dict]] = {"followers": [], "following": []}
     COUNT: Final[int] = 100
 
@@ -118,7 +128,6 @@ async def get_stats(
 
             try:
                 response: Response = requests.get(
-                    # 'https://www.instagram.com/api/v1/friendships/462306021/followers/',
                     f"https://www.instagram.com/api/v1/friendships/{ds_user_id}/{key}/",
                     params=params,
                     cookies=cookie_dict,
@@ -130,7 +139,7 @@ async def get_stats(
                 instagram_users[key] += response_dict["users"]
                 user_count = len(instagram_users[key])
 
-                with open("instagram_users1.json", "w", encoding="utf-8") as f:
+                with open(instagram_users_filename, "w", encoding="utf-8") as f:
                     json.dump(instagram_users, f, indent=4)
 
                 print(
@@ -173,9 +182,6 @@ async def get_stats(
                 break
         if not im_following_back:
             im_not_following_back.append(instagram_user_following_me)
-
-    instagram_stats_dir = Path(Path.cwd(), "statistics")
-    instagram_stats_dir.mkdir(exist_ok=True, parents=True)
 
     with open(
         Path(instagram_stats_dir, "not_following_me_back.txt"), "w", encoding="utf-8"
