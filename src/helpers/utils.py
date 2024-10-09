@@ -1,7 +1,7 @@
 from datetime import datetime
 import json
 from pathlib import Path
-from typing import Any, Dict, Final, List, Tuple, Union
+from typing import Any, Dict, Final, List, Optional, Tuple, Union
 from playwright.async_api import (
     Cookie,
     Playwright,
@@ -108,7 +108,18 @@ def create_instragram_stats_dir_and_instagram_users_filename(
     instagram_users_dir_name: str = "instagram_users",
     instagram_users_filename_prefix: str = "instagram_users",
 ) -> Tuple[Path, Path]:
-    instagram_stats_dir: Path = Path(Path.cwd(), stats_dir_name)
+    # Create directories
+    instagram_stats_dir: Optional[Path] = None
+    for path in list(Path.cwd().glob(f"*{stats_dir_name}")) + list(
+        Path.cwd().glob(f"*/{stats_dir_name}")
+    ):
+        if path.is_dir() and path.name == stats_dir_name:
+            instagram_stats_dir = path
+            break
+
+    if not instagram_stats_dir:
+        instagram_stats_dir = Path(Path.cwd(), stats_dir_name)
+
     instagram_stats_dir.mkdir(exist_ok=True, parents=True)
 
     instagram_users_dir: Path = Path(instagram_stats_dir, instagram_users_dir_name)
@@ -208,11 +219,12 @@ def get_instagram_users(
     return instagram_users
 
 
-def calculate_stats(instagram_users: Dict[str, List[Dict]]) -> Dict[str, List[Dict]]:
+def calculate_stats(
+    instagram_users: Dict[str, List[Dict]], show_stats: bool = False
+) -> Dict[str, List[Dict]]:
     not_following_me_back: List[dict] = []
     for instagram_user_im_following in instagram_users["following"]:
         user_name_im_following = instagram_user_im_following["username"]
-        # print(user_name_im_following, end=" ")
         is_following_me_back: bool = False
         for instagram_follower in instagram_users["followers"]:
             if user_name_im_following == instagram_follower["username"]:
@@ -236,6 +248,22 @@ def calculate_stats(instagram_users: Dict[str, List[Dict]]) -> Dict[str, List[Di
         "not_following_me_back": not_following_me_back,
         "im_not_following_back": im_not_following_back,
     }
+
+    if show_stats:
+        follower_following_str: Dict[str, str] = {
+            "following": "That I'm Following",
+            "followers": "That Are Followers",
+        }
+        for key, value in instagram_users.items():
+            print(f"Number of Users {follower_following_str[key]}:\t{len(value):<5}")
+
+        for key, value in instagram_stats.items():
+            print(
+                "Number of Users {}:\t{:<5}".format(
+                    " ".join(map(str.title, key.split("_"))).replace("Im", "I'm"),
+                    len(value),
+                )
+            )
 
     return instagram_stats
 

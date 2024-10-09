@@ -1,6 +1,6 @@
 # Imports
 from typing import Final, List, Dict
-from .utils import (
+from src.helpers.utils import (
     calculate_stats,
     create_instragram_stats_dir_and_instagram_users_filename,
     get_cookies,
@@ -64,7 +64,7 @@ async def get_stats(
 
     # Calculate statistics
     instagram_stats: Dict[str, List[Dict]] = calculate_stats(
-        instagram_users=instagram_users
+        instagram_users=instagram_users, show_stats=True
     )
 
     # Save statistics
