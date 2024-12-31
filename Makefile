@@ -41,6 +41,7 @@ install: $(REQUIREMENTS)
 	$(PIP) install --upgrade wheel    $(MUTE_OUTPUT) && \
 	$(PIP) install -r $(REQUIREMENTS) $(MUTE_OUTPUT) && \
 	$(PLAYWRIGHT) install $(MUTE_OUTPUT) && \
+	$(PLAYWRIGHT) install-deps $(MUTE_OUTPUT) && \
 	echo "Installing dependencies... [FINISHED]"
 
 # Create/Activate env; install dependencies
