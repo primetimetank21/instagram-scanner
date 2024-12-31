@@ -1,4 +1,5 @@
 .DEFAULT_GOAL := all
+# .SILENT: install
 
 # Variables
 DEV = 1
@@ -37,6 +38,12 @@ endif
 install: $(REQUIREMENTS)
 	@ chmod +x ./.github/add_github_hooks.sh && ./.github/add_github_hooks.sh
 	@ echo "Installing dependencies... [START]" && \
+	$(PIP) install --upgrade pip && \
+	$(PIP) install --upgrade wheel && \
+	$(PIP) install -r $(REQUIREMENTS) && \
+	$(PLAYWRIGHT) install && \
+	echo "Installing dependencies... [FINISHED]"
+#	@ echo "Installing dependencies... [START]" && \
 	$(PIP) install --upgrade pip      $(MUTE_OUTPUT) && \
 	$(PIP) install --upgrade wheel    $(MUTE_OUTPUT) && \
 	$(PIP) install -r $(REQUIREMENTS) $(MUTE_OUTPUT) && \
@@ -94,7 +101,7 @@ test: venv
 .PHONY: clean
 clean:
 	@ find . -type f -name "*.py[co]" -delete -o -type d -name "__pycache__" -delete
-	@ dirs=".mypy_cache .pytest_cache .ruff_cache"; \
+	@ dirs=".mypy_cache .pytest_cache .ruff_cache .ipynb_checkpoints"; \
 	for dir in $$dirs; do \
 		rm -rf "$$dir"; \
 	done

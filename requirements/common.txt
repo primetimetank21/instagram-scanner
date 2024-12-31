@@ -6,3 +6,9 @@ jupyter==1.0.0
 mypy==1.8.0
 ruff==0.2.1
 mock==5.1.0
+
+# Mypy typing Dependencies
+-r "mypy-requirements.txt"
+
+# Requests Dependencies
+requests==2.32.3
