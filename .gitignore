@@ -103,7 +103,7 @@ celerybeat.pid
 
 # Environments
 .env
-.venv
+.venv*
 env/
 venv/
 ENV/
@@ -125,12 +125,19 @@ venv.bak/
 .dmypy.json
 dmypy.json
 
+# ruff
+.ruff_cache
+
 # Pyre type checker
 .pyre/
 
 # Generated .txt files
 *.txt
-!requirements.txt
+!requirements/*
 
 # Personal JSON Cookies file
 instagram.json
+
+# Instagram Users
+instagram_users*.json
+example_response.json
