@@ -25,6 +25,7 @@ install:
 	$(PIP) install --upgrade wheel    $(MUTE_OUTPUT) && \
 	$(PIP) install -r $(REQUIREMENTS) $(MUTE_OUTPUT) && \
 	$(PLAYWRIGHT) install $(MUTE_OUTPUT) && \
+	$(PLAYWRIGHT) install-deps $(MUTE_OUTPUT) && \
 	echo "Installing dependencies... [FINISHED]"
 	@ echo "Installing dependencies... [START]"
 	uv sync && uv run playwright install
